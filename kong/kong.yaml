@@ -1,0 +1,71 @@
+_format_version: "3.0"
+_info:
+  defaults: {}
+
+services:
+  - name: example-service
+    url: https://httpbin.org
+    tags:
+      - managed-by-deck
+    routes:
+      - name: example-route
+        paths:
+          - /api/v1
+        methods:
+          - GET
+          - POST
+        strip_path: true
+        tags:
+          - managed-by-deck
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 100
+          hour: 1000
+          policy: local
+        tags:
+          - managed-by-deck
+      - name: key-auth
+        config:
+          key_names:
+            - apikey
+        tags:
+          - managed-by-deck
+
+  - name: another-service
+    url: https://jsonplaceholder.typicode.com
+    tags:
+      - managed-by-deck
+    routes:
+      - name: another-route
+        paths:
+          - /api/v2
+        methods:
+          - GET
+        strip_path: true
+        tags:
+          - managed-by-deck
+    plugins:
+      - name: cors
+        config:
+          origins:
+            - "*"
+          methods:
+            - GET
+            - POST
+          headers:
+            - Authorization
+            - Content-Type
+        tags:
+          - managed-by-deck
+
+plugins:
+  - name: prometheus
+    config:
+      status_code_metrics: true
+      latency_metrics: true
+      bandwidth_metrics: true
+      upstream_health_metrics: true
+    tags:
+      - managed-by-deck
+      - global

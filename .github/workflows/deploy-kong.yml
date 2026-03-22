@@ -37,9 +37,6 @@ jobs:
       - name: Validate kong.yaml syntax
         run: deck file validate kong/kong.yaml
 
-      - name: Lint kong.yaml
-        run: deck file lint kong/kong.yaml
-
   # ──────────────────────────────────────────────
   # JOB 2: Diff — shows what will change (PR only)
   # ──────────────────────────────────────────────

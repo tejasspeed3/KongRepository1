@@ -15,6 +15,7 @@ services:
           - GET
           - POST
           - PUT
+          - DELETE
         strip_path: true
         tags:
           - managed-by-deck

@@ -1,0 +1,143 @@
+name: Deploy Kong Konnect Configuration
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'kong/**'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'kong/**'
+  workflow_dispatch:
+
+env:
+  DECK_VERSION: "1.40.0"
+
+jobs:
+  # ──────────────────────────────────────────────
+  # JOB 1: Validate — runs on every PR and push
+  # ──────────────────────────────────────────────
+  validate:
+    name: Validate decK Config
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install decK
+        run: |
+          curl -sL https://github.com/Kong/deck/releases/download/v${{ env.DECK_VERSION }}/deck_${{ env.DECK_VERSION }}_linux_amd64.tar.gz \
+            | tar -xz -C /usr/local/bin deck
+          deck version
+
+      - name: Validate kong.yaml syntax
+        run: deck file validate kong/kong.yaml
+
+      - name: Lint kong.yaml
+        run: deck file lint kong/kong.yaml
+
+  # ──────────────────────────────────────────────
+  # JOB 2: Diff — shows what will change (PR only)
+  # ──────────────────────────────────────────────
+  diff:
+    name: Show Config Diff
+    runs-on: ubuntu-latest
+    needs: validate
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install decK
+        run: |
+          curl -sL https://github.com/Kong/deck/releases/download/v${{ env.DECK_VERSION }}/deck_${{ env.DECK_VERSION }}_linux_amd64.tar.gz \
+            | tar -xz -C /usr/local/bin deck
+
+      - name: Run decK diff against Konnect
+        id: deck_diff
+        run: |
+          DIFF_OUTPUT=$(deck gateway diff kong/kong.yaml \
+            --konnect-token "${{ secrets.KONNECT_TOKEN }}" \
+            --konnect-control-plane-name "${{ vars.KONNECT_CONTROL_PLANE_NAME }}" \
+            2>&1) || true
+          echo "diff_output<<EOF" >> $GITHUB_OUTPUT
+          echo "$DIFF_OUTPUT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Post diff as PR comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const diff = `${{ steps.deck_diff.outputs.diff_output }}`;
+            const body = diff.trim()
+              ? `### 🔍 Kong Konnect Config Diff\n\`\`\`\n${diff}\n\`\`\``
+              : `### ✅ Kong Konnect Config Diff\nNo changes detected.`;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const existing = comments.find(c =>
+              c.user.login === 'github-actions[bot]' &&
+              c.body.includes('Kong Konnect Config Diff')
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+  # ──────────────────────────────────────────────
+  # JOB 3: Deploy — only on merge to main
+  # ──────────────────────────────────────────────
+  deploy:
+    name: Deploy to Kong Konnect
+    runs-on: ubuntu-latest
+    needs: validate
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    environment:
+      name: production
+      url: https://cloud.konghq.com
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install decK
+        run: |
+          curl -sL https://github.com/Kong/deck/releases/download/v${{ env.DECK_VERSION }}/deck_${{ env.DECK_VERSION }}_linux_amd64.tar.gz \
+            | tar -xz -C /usr/local/bin deck
+
+      - name: Sync config to Kong Konnect
+        run: |
+          deck gateway sync kong/kong.yaml \
+            --konnect-token "${{ secrets.KONNECT_TOKEN }}" \
+            --konnect-control-plane-name "${{ vars.KONNECT_CONTROL_PLANE_NAME }}"
+
+      - name: Verify deployment
+        run: |
+          deck gateway diff kong/kong.yaml \
+            --konnect-token "${{ secrets.KONNECT_TOKEN }}" \
+            --konnect-control-plane-name "${{ vars.KONNECT_CONTROL_PLANE_NAME }}" \
+            | grep -q "Summary: 0 to create, 0 to update, 0 to delete" \
+            && echo "✅ Deployment verified — no drift detected." \
+            || (echo "❌ Drift detected after sync!" && exit 1)

@@ -1,0 +1,491 @@
+_format_version: "3.0"
+_konnect:
+  control_plane_name: serverless-dev-cp
+consumers:
+- keyauth_credentials:
+  - key: abcde
+  username: flight-consumer
+services:
+- connect_timeout: 60000
+  enabled: true
+  host: flighthost
+  name: datakit-demo-service
+  port: 443
+  protocol: https
+  read_timeout: 60000
+  retries: 5
+  routes:
+  - https_redirect_status_code: 426
+    methods:
+    - GET
+    name: datakit-demo-route
+    path_handling: v0
+    paths:
+    - /flights
+    plugins:
+    - config:
+        ca_certificates: null
+        debug: false
+        nodes:
+        - input: null
+          inputs: null
+          method: GET
+          name: AUTHOR
+          output: null
+          outputs: null
+          ssl_server_name: null
+          ssl_verify: true
+          timeout: null
+          type: call
+          url: https://httpbin.konghq.com/json
+        - input: null
+          inputs: null
+          method: POST
+          name: UUID
+          output: null
+          outputs: null
+          ssl_server_name: null
+          ssl_verify: true
+          timeout: null
+          type: call
+          url: https://kong-ef3168732eing87r1.kongcloud.dev/post
+        - input: null
+          inputs:
+            input1: AUTHOR.body
+            input2: UUID.body
+          jq: |
+            {
+              author: .input1.slideshow.author,
+              date: .input1.slideshow.date,
+             title: .input1.slideshow.title,
+             slidetitle: .input1.slideshow.slides[0].type,
+              uuid: .input2.headers,
+            }
+          name: JOIN
+          output: null
+          type: jq
+        - attributes_block_name: null
+          attributes_name_prefix: '-'
+          input: JOIN
+          inputs: null
+          name: JSON_TO_XML_1
+          output: null
+          root_element_name: null
+          text_block_name: '#text'
+          type: json_to_xml
+        - attributes_block_name: null
+          attributes_name_prefix: '-'
+          input: JSON_TO_XML_1
+          name: XML_TO_JSON_1
+          output: null
+          recognize_type: true
+          text_as_property: false
+          text_block_name: '#text'
+          type: xml_to_json
+          xpath: null
+        - input: null
+          inputs:
+            input1: service_response.body
+            input2: JOIN
+          jq: |-
+            {
+            number: .input1.number,
+             route_id: .input1.route_id,
+            details: .input2,
+            }
+          name: JQ_1
+          output: null
+          type: jq
+        - input: null
+          inputs:
+            body: JQ_1
+            headers: null
+          name: EXIT_1
+          status: 200
+          type: exit
+          warn_headers_sent: null
+        resources: null
+      enabled: true
+      name: datakit
+      protocols:
+      - grpc
+      - grpcs
+      - http
+      - https
+      tags:
+      - datakit
+      - datakitv1
+      - datakit_1.0.0
+      - dev
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: false
+    tags:
+    - datakit
+    - datakitv1
+    - datakit_1.0.0
+    - dev
+  tags:
+  - datakit
+  - datakitv1
+  - datakit_1.0.0
+  - dev
+  write_timeout: 60000
+- connect_timeout: 60000
+  enabled: true
+  host: flighthost
+  name: my-first-flight-service
+  path: /flights
+  port: 443
+  protocol: https
+  read_timeout: 60000
+  retries: 5
+  routes:
+  - https_redirect_status_code: 426
+    name: my-first-flight-route
+    path_handling: v0
+    paths:
+    - /v1
+    plugins:
+    - config:
+        anonymous: null
+        hide_credentials: false
+        identity_realms:
+        - id: 8d2bca20-084e-46b0-9998-34908a216bf2
+          region: in
+          scope: realm
+        key_in_body: false
+        key_in_header: true
+        key_in_query: true
+        key_names:
+        - apikey
+        principals:
+          directory: default
+          enabled: false
+          error_on_miss: true
+        realm: null
+        run_on_preflight: true
+      enabled: true
+      instance_name: my-first-flight-auth
+      name: key-auth
+      protocols:
+      - grpc
+      - grpcs
+      - http
+      - https
+      - ws
+      - wss
+      tags:
+      - flight
+      - flightv1
+      - flight_1.0.0
+      - dev
+    - config:
+        custom_key: null
+        day: null
+        error_code: 429
+        error_message: API rate limit exceeded
+        fault_tolerant: true
+        header_name: null
+        hide_client_headers: false
+        hour: null
+        limit_by: consumer
+        minute: 5
+        month: null
+        path: null
+        policy: local
+        redis:
+          cloud_authentication: null
+          database: 0
+          host: null
+          password: null
+          port: 6379
+          server_name: null
+          ssl: false
+          ssl_verify: false
+          timeout: 2000
+          username: null
+        redis_database: 0
+        redis_host: null
+        redis_password: null
+        redis_port: 6379
+        redis_server_name: null
+        redis_ssl: false
+        redis_ssl_verify: false
+        redis_timeout: 2000
+        redis_username: null
+        second: null
+        sync_rate: -1
+        year: null
+      enabled: true
+      name: rate-limiting
+      protocols:
+      - grpc
+      - grpcs
+      - http
+      - https
+      tags:
+      - flight
+      - flightv1
+      - flight_1.0.0
+      - dev
+    preserve_host: false
+    protocols:
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+    tags:
+    - flight
+    - flightv1
+    - flight_1.0.0
+    - dev
+  tags:
+  - flight
+  - flightv1
+  - flight_1.0.0
+  - dev
+  write_timeout: 60000
+- connect_timeout: 60000
+  enabled: true
+  host: httpbin.org
+  name: my-post-service
+  path: /post
+  port: 443
+  protocol: https
+  read_timeout: 60000
+  retries: 5
+  routes:
+  - https_redirect_status_code: 426
+    methods:
+    - POST
+    name: my-post-route
+    path_handling: v0
+    paths:
+    - /post
+    plugins:
+    - config:
+        access:
+        - |-
+          local cjson = require("cjson.safe")
+          kong.service.request.enable_buffering()
+          local raw = kong.request.get_raw_body()
+          local body = cjson.decode(raw)
+          if type(body) == "table" then
+            for _, item in ipairs(body) do
+              if type(item) == "table" then
+                item.route_id = nil
+                if item.number == "KA0284" then
+                  item.number = "AB0285"
+                end
+                item.name = "Ethiad"
+              end
+            end
+            kong.service.request.set_raw_body(cjson.encode(body))
+          end
+          kong.service.request.set_header("X-flight-Code", "Fl-123")
+        body_filter: []
+        certificate: []
+        functions: []
+        header_filter: []
+        log: []
+        rewrite: []
+        ws_client_frame: []
+        ws_close: []
+        ws_handshake: []
+        ws_upstream_frame: []
+      enabled: true
+      name: pre-function
+      protocols:
+      - grpc
+      - grpcs
+      - http
+      - https
+      tags:
+      - post
+      - postv1
+      - post_1.0.0
+      - dev
+    - config:
+        add:
+          body: []
+          headers:
+          - X-Airline-Code:AB123
+          json_types: []
+          querystring: []
+        allow:
+          body: null
+        append:
+          body: []
+          headers: []
+          json_types: []
+          querystring: []
+        dots_in_keys: false
+        http_method: null
+        max_request_body_size: -1
+        remove:
+          body: []
+          headers:
+          - Host
+          querystring: []
+        rename:
+          body:
+          - number:number_new
+          headers: []
+          querystring: []
+        replace:
+          body: []
+          headers: []
+          json_types: []
+          querystring: []
+          uri: null
+      enabled: true
+      name: request-transformer-advanced
+      protocols:
+      - grpc
+      - grpcs
+      - http
+      - https
+      tags:
+      - post
+      - postv1
+      - post_1.0.0
+      - dev
+    - config:
+        add:
+          headers: []
+          json: []
+          json_types: []
+        append:
+          headers: []
+          json: []
+          json_types: []
+        remove:
+          headers:
+          - Host
+          json: []
+        rename:
+          headers: []
+          json: []
+        replace:
+          headers: []
+          json: []
+          json_types: []
+      enabled: true
+      name: response-transformer
+      protocols:
+      - grpc
+      - grpcs
+      - http
+      - https
+      tags:
+      - post
+      - postv1
+      - post_1.0.0
+      - dev
+    preserve_host: false
+    protocols:
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+    tags:
+    - post
+    - postv1
+    - post_1.0.0
+    - dev
+  tags:
+  - post
+  - postv1
+  - post_1.0.0
+  - dev
+  write_timeout: 60000
+upstreams:
+- algorithm: round-robin
+  hash_fallback: none
+  hash_on: none
+  hash_on_cookie_path: /
+  healthchecks:
+    active:
+      concurrency: 10
+      healthy:
+        http_statuses:
+        - 200
+        - 302
+        interval: 0
+        successes: 0
+      http_path: /
+      https_verify_certificate: true
+      timeout: 1
+      type: http
+      unhealthy:
+        http_failures: 0
+        http_statuses:
+        - 429
+        - 404
+        - 500
+        - 501
+        - 502
+        - 503
+        - 504
+        - 505
+        interval: 0
+        tcp_failures: 0
+        timeouts: 0
+    passive:
+      healthy:
+        http_statuses:
+        - 200
+        - 201
+        - 202
+        - 203
+        - 204
+        - 205
+        - 206
+        - 207
+        - 208
+        - 226
+        - 300
+        - 301
+        - 302
+        - 303
+        - 304
+        - 305
+        - 306
+        - 307
+        - 308
+        successes: 0
+      type: http
+      unhealthy:
+        http_failures: 0
+        http_statuses:
+        - 429
+        - 500
+        - 503
+        tcp_failures: 0
+        timeouts: 0
+    threshold: 0
+  name: flighthost
+  slots: 10000
+  sticky_sessions_cookie_path: /
+  tags:
+  - flight
+  - flightv1
+  - flight_1.0.0
+  - dev
+  targets:
+  - tags:
+    - flight
+    - flightv1
+    - flight_1.0.0
+    - dev
+    target: api.kong-air.com:443
+    weight: 100
+  use_srv_name: false
